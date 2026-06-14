@@ -118,3 +118,24 @@ Le développement est organisé avec des branches de fonctionnalités :
 * `feature/...` : branches dédiées à chaque évolution fonctionnelle ou technique.
 
 Chaque fonctionnalité est intégrée dans `develop` via une Pull Request.
+
+
+## Couverture de tests
+
+Le projet utilise JaCoCo pour générer un rapport de couverture de tests.
+
+Pour lancer les tests et générer le rapport de couverture :
+
+```bash
+./mvnw clean verify
+```
+
+Le rapport HTML est ensuite disponible dans le dossier suivant :
+
+```text
+target/site/jacoco/index.html
+```
+
+Le rapport permet de vérifier la couverture des tests unitaires et d'intégration sur les principales couches applicatives du backend : services, contrôleurs, sécurité, gestion des erreurs et initialisation des données.
+
+Les classes principalement structurelles, comme les DTO, les entités JPA et certaines classes de configuration, sont exclues du calcul afin de concentrer l'analyse sur la logique applicative réellement testée.
