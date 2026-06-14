@@ -38,7 +38,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/document-files/application-files/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/document-files/admin/**").hasRole("ADMIN")
 
+                        .requestMatchers(HttpMethod.GET, "/api/monitoring/status").hasRole("ADMIN")
                         .requestMatchers("/actuator/health").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .httpBasic(Customizer.withDefaults())
