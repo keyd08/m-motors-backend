@@ -23,8 +23,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
+                .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/vehicles/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/vehicles").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/vehicles/**").hasRole("ADMIN")
