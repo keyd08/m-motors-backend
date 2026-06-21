@@ -49,4 +49,10 @@ public class VehicleController {
         Vehicle updatedVehicle = vehicleService.switchVehicleMode(id, mode);
         return VehicleResponse.fromEntity(updatedVehicle);
     }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteVehicle(@PathVariable Long id) {
+        vehicleService.deleteVehicle(id);
+    }
 }

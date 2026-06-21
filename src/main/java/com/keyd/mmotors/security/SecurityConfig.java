@@ -31,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/vehicles/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/vehicles").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/vehicles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/vehicles/**").hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.POST, "/api/application-files").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/application-files/my/**").hasRole("CLIENT")

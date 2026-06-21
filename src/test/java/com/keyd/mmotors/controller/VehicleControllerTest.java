@@ -93,4 +93,12 @@ class VehicleControllerTest {
         assertThat(capturedVehicle.getModel()).isEqualTo("308");
         assertThat(capturedVehicle.getMode()).isEqualTo(VehicleMode.SALE);
     }
+
+    @Test
+    @DisplayName("Doit supprimer logiquement un véhicule")
+    void shouldDeleteVehicle() {
+        vehicleController.deleteVehicle(1L);
+
+        verify(vehicleService).deleteVehicle(1L);
+    }
 }

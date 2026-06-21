@@ -89,4 +89,85 @@ class VehicleServiceTest {
         verify(vehicleRepository).findById(1L);
         verify(vehicleRepository).save(vehicle);
     }
+    @Test
+    @DisplayName("Doit rechercher tous les véhicules disponibles sans filtre de mode")
+    void shouldFindAllAvailableVehiclesWhenModeIsNull() {
+        Vehicle vehicle = Vehicle.builder()
+                .id(2L)
+                .brand("Toyota")
+                .model("Yaris")
+                .energy("Hybride")
+                .mileage(22000)
+                .price(new BigDecimal("15900"))
+                .mode(VehicleMode.SALE)
+                .available(true)
+                .build();
+
+        when(vehicleRepository.findByAvailableTrue()).thenReturn(List.of(vehicle));
+
+        List<Vehicle> result = vehicleService.findAvailableVehicles(null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getBrand()).isEqualTo("Toyota");
+        verify(vehicleRepository).findByAvailableTrue();
+    }
+
+    @Test
+    @DisplayName("Doit créer un véhicule disponible par défaut")
+    void shouldCreateVehicleWithDefaultAvailability() {
+        Vehicle vehicle = Vehicle.builder()
+                .id(10L)
+                .brand("Citroen")
+                .model("C3")
+                .energy("Essence")
+                .mileage(18000)
+                .price(new BigDecimal("13900"))
+                .mode(VehicleMode.SALE)
+                .available(null)
+                .build();
+
+        Vehicle savedVehicle = Vehicle.builder()
+                .id(1L)
+                .brand("Citroen")
+                .model("C3")
+                .energy("Essence")
+                .mileage(18000)
+                .price(new BigDecimal("13900"))
+                .mode(VehicleMode.SALE)
+                .available(true)
+                .build();
+
+        when(vehicleRepository.save(vehicle)).thenReturn(savedVehicle);
+
+        Vehicle result = vehicleService.createVehicle(vehicle);
+
+        assertThat(result.getAvailable()).isTrue();
+        assertThat(vehicle.getId()).isNull();
+        assertThat(vehicle.getAvailable()).isTrue();
+        verify(vehicleRepository).save(vehicle);
+    }
+
+    @Test
+    @DisplayName("Doit rendre un véhicule indisponible lors de la suppression")
+    void shouldDeleteVehicleLogically() {
+        Vehicle vehicle = Vehicle.builder()
+                .id(1L)
+                .brand("Renault")
+                .model("Megane")
+                .energy("Hybride")
+                .mileage(35000)
+                .price(new BigDecimal("18900"))
+                .mode(VehicleMode.SALE)
+                .available(true)
+                .build();
+
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.save(vehicle)).thenReturn(vehicle);
+
+        vehicleService.deleteVehicle(1L);
+
+        assertThat(vehicle.getAvailable()).isFalse();
+        verify(vehicleRepository).findById(1L);
+        verify(vehicleRepository).save(vehicle);
+    }
 }
