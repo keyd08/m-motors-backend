@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/document-files/application-files/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/document-files/application-files/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/document-files/admin/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/document-files/*/download").authenticated()
 
                         .requestMatchers(HttpMethod.GET, "/api/monitoring/status").hasRole("ADMIN")
                         .requestMatchers("/actuator/health").permitAll()

@@ -4,6 +4,9 @@ import com.keyd.mmotors.dto.DocumentFileRequest;
 import com.keyd.mmotors.dto.DocumentFileResponse;
 import com.keyd.mmotors.entity.*;
 import com.keyd.mmotors.service.DocumentFileService;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +57,65 @@ class DocumentFileControllerTest {
         assertThat(result.applicationFileId()).isEqualTo(100L);
 
         verify(documentFileService).createDocumentFile("client@mmotors.demo", 100L, request);
+    }
+
+    @Test
+    @DisplayName("Doit téléverser un document depuis une requête multipart")
+    void shouldUploadDocumentFile() {
+        Principal principal = () -> "client@mmotors.demo";
+        MultipartFile multipartFile = new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                "piece-identite.pdf",
+                "application/pdf",
+                "contenu pdf".getBytes()
+        );
+
+        DocumentFile documentFile = buildDocumentFile();
+
+        when(documentFileService.uploadDocumentFile(
+                "client@mmotors.demo",
+                100L,
+                DocumentType.IDENTITY_DOCUMENT,
+                multipartFile
+        )).thenReturn(documentFile);
+
+        DocumentFileResponse result = documentFileController.uploadDocumentFile(
+                principal,
+                100L,
+                DocumentType.IDENTITY_DOCUMENT,
+                multipartFile
+        );
+
+        assertThat(result.fileName()).isEqualTo("piece-identite.pdf");
+
+        verify(documentFileService).uploadDocumentFile(
+                "client@mmotors.demo",
+                100L,
+                DocumentType.IDENTITY_DOCUMENT,
+                multipartFile
+        );
+    }
+
+    @Test
+    @DisplayName("Doit retourner un document en téléchargement")
+    void shouldDownloadDocumentFile() {
+        Principal principal = () -> "client@mmotors.demo";
+        DocumentFile documentFile = buildDocumentFile();
+        ByteArrayResource resource = new ByteArrayResource("contenu pdf".getBytes());
+
+        when(documentFileService.findDownloadableDocument("client@mmotors.demo", 200L))
+                .thenReturn(documentFile);
+        when(documentFileService.loadDocumentResource(documentFile)).thenReturn(resource);
+
+        ResponseEntity<org.springframework.core.io.Resource> result =
+                documentFileController.downloadDocumentFile(principal, 200L);
+
+        assertThat(result.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(result.getHeaders().getContentDisposition().getFilename())
+                .isEqualTo("piece-identite.pdf");
+
+        verify(documentFileService).findDownloadableDocument("client@mmotors.demo", 200L);
+        verify(documentFileService).loadDocumentResource(documentFile);
     }
 
     @Test

@@ -8,12 +8,17 @@ import com.keyd.mmotors.repository.ApplicationFileRepository;
 import com.keyd.mmotors.repository.DocumentFileRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +41,9 @@ class DocumentFileServiceTest {
 
     @InjectMocks
     private DocumentFileService documentFileService;
+
+    @TempDir
+    private Path temporaryDirectory;
 
     @Test
     @DisplayName("Doit ajouter un document justificatif à un dossier client")
@@ -127,6 +135,186 @@ class DocumentFileServiceTest {
         assertThat(result.get(0).getFileName()).isEqualTo("rib.pdf");
 
         verify(documentFileRepository).findByApplicationFileId(100L);
+    }
+
+    @Test
+    @DisplayName("Doit téléverser un document justificatif")
+    void shouldUploadDocumentFileForClientApplicationFile() throws Exception {
+        AppUser client = buildClient();
+        ApplicationFile applicationFile = buildApplicationFile(client);
+        MultipartFile multipartFile = buildMultipartFile(
+                "piece identité.pdf",
+                "application/pdf",
+                "contenu pdf"
+        );
+
+        ReflectionTestUtils.setField(
+                documentFileService,
+                "documentUploadDirectory",
+                temporaryDirectory.toString()
+        );
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+        when(documentFileRepository.save(org.mockito.ArgumentMatchers.any(DocumentFile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        DocumentFile result = documentFileService.uploadDocumentFile(
+                "client@mmotors.demo",
+                100L,
+                DocumentType.IDENTITY_DOCUMENT,
+                multipartFile
+        );
+
+        assertThat(result.getFileName()).isEqualTo("piece identité.pdf");
+        assertThat(result.getContentType()).isEqualTo("application/pdf");
+        assertThat(result.getSize()).isEqualTo(multipartFile.getSize());
+        assertThat(Path.of(result.getFilePath())).exists();
+
+        ArgumentCaptor<DocumentFile> captor = ArgumentCaptor.forClass(DocumentFile.class);
+        verify(documentFileRepository).save(captor.capture());
+
+        assertThat(captor.getValue().getFilePath()).contains("piece_identit_.pdf");
+    }
+
+    @Test
+    @DisplayName("Doit refuser le téléversement d'un fichier vide")
+    void shouldRejectEmptyUploadedDocumentFile() {
+        AppUser client = buildClient();
+        ApplicationFile applicationFile = buildApplicationFile(client);
+        MultipartFile multipartFile = buildMultipartFile(
+                "vide.pdf",
+                "application/pdf",
+                ""
+        );
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+
+        assertThatThrownBy(() -> documentFileService.uploadDocumentFile(
+                "client@mmotors.demo",
+                100L,
+                DocumentType.IDENTITY_DOCUMENT,
+                multipartFile
+        ))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("obligatoire");
+    }
+
+    @Test
+    @DisplayName("Doit refuser le téléversement d'un format non autorisé")
+    void shouldRejectUnsupportedUploadedDocumentFile() {
+        AppUser client = buildClient();
+        ApplicationFile applicationFile = buildApplicationFile(client);
+        MultipartFile multipartFile = buildMultipartFile(
+                "script.exe",
+                "application/octet-stream",
+                "contenu"
+        );
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+
+        assertThatThrownBy(() -> documentFileService.uploadDocumentFile(
+                "client@mmotors.demo",
+                100L,
+                DocumentType.OTHER,
+                multipartFile
+        ))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("format");
+    }
+
+    @Test
+    @DisplayName("Doit autoriser l'administrateur à télécharger un document")
+    void shouldFindDownloadableDocumentForAdmin() {
+        AppUser admin = AppUser.builder()
+                .id(9L)
+                .firstName("Admin")
+                .lastName("Demo")
+                .email("admin@mmotors.demo")
+                .password("encoded-password")
+                .role(Role.ADMIN)
+                .build();
+
+        DocumentFile documentFile = buildStoredDocumentFile(buildApplicationFile(buildClient()));
+
+        when(appUserRepository.findByEmail("admin@mmotors.demo")).thenReturn(Optional.of(admin));
+        when(documentFileRepository.findById(200L)).thenReturn(Optional.of(documentFile));
+
+        DocumentFile result = documentFileService.findDownloadableDocument("admin@mmotors.demo", 200L);
+
+        assertThat(result.getId()).isEqualTo(200L);
+    }
+
+    @Test
+    @DisplayName("Doit autoriser le client propriétaire à télécharger son document")
+    void shouldFindDownloadableDocumentForOwnerClient() {
+        AppUser client = buildClient();
+        DocumentFile documentFile = buildStoredDocumentFile(buildApplicationFile(client));
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(documentFileRepository.findById(200L)).thenReturn(Optional.of(documentFile));
+
+        DocumentFile result = documentFileService.findDownloadableDocument("client@mmotors.demo", 200L);
+
+        assertThat(result.getFileName()).isEqualTo("piece-identite.pdf");
+    }
+
+    @Test
+    @DisplayName("Doit refuser le téléchargement d'un document d'un autre client")
+    void shouldRejectDownloadForAnotherClient() {
+        AppUser owner = buildClient();
+        AppUser otherClient = AppUser.builder()
+                .id(2L)
+                .firstName("Autre")
+                .lastName("Client")
+                .email("autre@mmotors.demo")
+                .password("encoded-password")
+                .role(Role.CLIENT)
+                .build();
+
+        DocumentFile documentFile = buildStoredDocumentFile(buildApplicationFile(owner));
+
+        when(appUserRepository.findByEmail("autre@mmotors.demo")).thenReturn(Optional.of(otherClient));
+        when(documentFileRepository.findById(200L)).thenReturn(Optional.of(documentFile));
+
+        assertThatThrownBy(() -> documentFileService.findDownloadableDocument("autre@mmotors.demo", 200L))
+                .isInstanceOf(com.keyd.mmotors.exception.ResourceNotFoundException.class)
+                .hasMessageContaining("Document introuvable");
+    }
+
+    @Test
+    @DisplayName("Doit charger une ressource de document téléchargeable")
+    void shouldLoadDocumentResource() throws Exception {
+        Path filePath = temporaryDirectory.resolve("piece-identite.pdf");
+        Files.writeString(filePath, "contenu pdf");
+
+        DocumentFile documentFile = buildStoredDocumentFile(buildApplicationFile(buildClient()));
+        documentFile.setFilePath(filePath.toString());
+
+        assertThat(documentFileService.loadDocumentResource(documentFile).exists()).isTrue();
+    }
+
+    private MultipartFile buildMultipartFile(String fileName, String contentType, String content) {
+        return new org.springframework.mock.web.MockMultipartFile(
+                "file",
+                fileName,
+                contentType,
+                content.getBytes()
+        );
+    }
+
+    private DocumentFile buildStoredDocumentFile(ApplicationFile applicationFile) {
+        return DocumentFile.builder()
+                .id(200L)
+                .type(DocumentType.IDENTITY_DOCUMENT)
+                .fileName("piece-identite.pdf")
+                .filePath("/uploads/piece-identite.pdf")
+                .contentType("application/pdf")
+                .size(250000L)
+                .applicationFile(applicationFile)
+                .build();
     }
 
     private AppUser buildClient() {
