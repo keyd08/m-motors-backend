@@ -11,6 +11,7 @@ import com.keyd.mmotors.repository.DocumentFileRepository;
 import com.keyd.mmotors.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -47,6 +48,7 @@ public class ApplicationFileService {
     }
 
 
+    @Transactional
     public void deleteClientApplicationFile(String clientEmail, Long applicationFileId) {
         ApplicationFile applicationFile = findClientApplicationFileById(clientEmail, applicationFileId);
 
