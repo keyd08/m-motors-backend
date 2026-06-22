@@ -40,6 +40,16 @@ public class ApplicationFileController {
                 .toList();
     }
 
+
+    @DeleteMapping("/my/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMyApplicationFile(
+            Principal principal,
+            @PathVariable Long id
+    ) {
+        applicationFileService.deleteClientApplicationFile(principal.getName(), id);
+    }
+
     @GetMapping("/my/{id}")
     public ApplicationFileResponse findMyApplicationFileById(
             Principal principal,

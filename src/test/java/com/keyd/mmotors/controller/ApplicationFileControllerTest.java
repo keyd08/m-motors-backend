@@ -98,6 +98,17 @@ class ApplicationFileControllerTest {
         verify(applicationFileService).updateApplicationFileStatus(100L, request);
     }
 
+
+    @Test
+    @DisplayName("Doit supprimer le dossier du client connecté")
+    void shouldDeleteCurrentClientApplicationFile() {
+        Principal principal = () -> "client@mmotors.demo";
+
+        applicationFileController.deleteMyApplicationFile(principal, 100L);
+
+        verify(applicationFileService).deleteClientApplicationFile("client@mmotors.demo", 100L);
+    }
+
     private ApplicationFile buildApplicationFile() {
         AppUser client = AppUser.builder()
                 .id(1L)

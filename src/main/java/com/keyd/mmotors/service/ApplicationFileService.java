@@ -12,6 +12,11 @@ import com.keyd.mmotors.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+
 import java.util.List;
 
 @Service
@@ -40,6 +45,21 @@ public class ApplicationFileService {
                 .build();
 
         return applicationFileRepository.save(applicationFile);
+    }
+
+
+    public void deleteClientApplicationFile(String clientEmail, Long applicationFileId) {
+        ApplicationFile applicationFile = findClientApplicationFileById(clientEmail, applicationFileId);
+
+        if (applicationFile.getStatus() != ApplicationStatus.INCOMPLETE) {
+            throw new BusinessRuleException("Seul un dossier en cours peut être supprimé");
+        }
+
+        List<DocumentFile> documentFiles = documentFileRepository.findByApplicationFileId(applicationFile.getId());
+        documentFiles.forEach((documentFile) -> deletePhysicalFile(documentFile.getFilePath()));
+
+        documentFileRepository.deleteByApplicationFileId(applicationFile.getId());
+        applicationFileRepository.delete(applicationFile);
     }
 
     public List<ApplicationFile> findClientApplicationFiles(String clientEmail) {
@@ -82,6 +102,15 @@ public class ApplicationFileService {
         applicationFile.setAdminComment(request.adminComment());
 
         return applicationFileRepository.save(applicationFile);
+    }
+
+
+    private void deletePhysicalFile(String filePath) {
+        try {
+            Files.deleteIfExists(Paths.get(filePath).toAbsolutePath().normalize());
+        } catch (IOException exception) {
+            throw new BusinessRuleException("Impossible de supprimer un document du dossier");
+        }
     }
 
     private void validateApplicationTypeWithVehicleMode(ApplicationType applicationType, VehicleMode vehicleMode) {

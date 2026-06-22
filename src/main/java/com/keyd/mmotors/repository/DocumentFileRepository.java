@@ -10,4 +10,6 @@ public interface DocumentFileRepository extends JpaRepository<DocumentFile, Long
     List<DocumentFile> findByApplicationFileId(Long applicationFileId);
 
     long countByApplicationFileId(Long applicationFileId);
+
+    void deleteByApplicationFileId(Long applicationFileId);
 }

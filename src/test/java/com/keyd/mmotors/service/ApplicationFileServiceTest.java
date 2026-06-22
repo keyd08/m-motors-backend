@@ -217,4 +217,70 @@ class ApplicationFileServiceTest {
         verify(documentFileRepository).countByApplicationFileId(100L);
     }
 
+    @Test
+    @DisplayName("Doit supprimer un dossier client en cours")
+    void shouldDeleteIncompleteClientApplicationFile() {
+        AppUser client = AppUser.builder()
+                .id(1L)
+                .email("client@mmotors.demo")
+                .password("encoded-password")
+                .role(Role.CLIENT)
+                .firstName("Client")
+                .lastName("Demo")
+                .build();
+
+        ApplicationFile applicationFile = ApplicationFile.builder()
+                .id(100L)
+                .type(ApplicationType.PURCHASE)
+                .status(ApplicationStatus.INCOMPLETE)
+                .client(client)
+                .build();
+
+        DocumentFile documentFile = DocumentFile.builder()
+                .id(200L)
+                .type(DocumentType.IDENTITY_DOCUMENT)
+                .fileName("piece-identite.pdf")
+                .filePath("target/document-inexistant.pdf")
+                .contentType("application/pdf")
+                .size(120000L)
+                .applicationFile(applicationFile)
+                .build();
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+        when(documentFileRepository.findByApplicationFileId(100L)).thenReturn(java.util.List.of(documentFile));
+
+        applicationFileService.deleteClientApplicationFile("client@mmotors.demo", 100L);
+
+        verify(documentFileRepository).deleteByApplicationFileId(100L);
+        verify(applicationFileRepository).delete(applicationFile);
+    }
+
+    @Test
+    @DisplayName("Doit refuser la suppression d'un dossier déjà envoyé")
+    void shouldRejectDeletingSubmittedClientApplicationFile() {
+        AppUser client = AppUser.builder()
+                .id(1L)
+                .email("client@mmotors.demo")
+                .password("encoded-password")
+                .role(Role.CLIENT)
+                .firstName("Client")
+                .lastName("Demo")
+                .build();
+
+        ApplicationFile applicationFile = ApplicationFile.builder()
+                .id(100L)
+                .type(ApplicationType.PURCHASE)
+                .status(ApplicationStatus.SUBMITTED)
+                .client(client)
+                .build();
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+
+        assertThatThrownBy(() -> applicationFileService.deleteClientApplicationFile("client@mmotors.demo", 100L))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("dossier en cours");
+    }
+
 }
