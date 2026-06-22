@@ -5,12 +5,14 @@ import com.keyd.mmotors.dto.ApplicationFileResponse;
 import com.keyd.mmotors.dto.ApplicationFileStatusRequest;
 import com.keyd.mmotors.entity.*;
 import com.keyd.mmotors.service.ApplicationFileService;
+import com.keyd.mmotors.service.ApplicationFilePdfService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.security.Principal;
@@ -25,6 +27,9 @@ class ApplicationFileControllerTest {
 
     @Mock
     private ApplicationFileService applicationFileService;
+
+    @Mock
+    private ApplicationFilePdfService applicationFilePdfService;
 
     @InjectMocks
     private ApplicationFileController applicationFileController;
@@ -107,6 +112,41 @@ class ApplicationFileControllerTest {
         applicationFileController.deleteMyApplicationFile(principal, 100L);
 
         verify(applicationFileService).deleteClientApplicationFile("client@mmotors.demo", 100L);
+    }
+
+
+    @Test
+    @DisplayName("Doit télécharger le récapitulatif PDF du client connecté")
+    void shouldDownloadCurrentClientSummaryPdf() {
+        Principal principal = () -> "client@mmotors.demo";
+        byte[] pdf = "%PDF-1.4".getBytes();
+
+        when(applicationFilePdfService.generateClientSummaryPdf("client@mmotors.demo", 100L))
+                .thenReturn(pdf);
+
+        ResponseEntity<byte[]> result = applicationFileController.downloadMySummaryPdf(principal, 100L);
+
+        assertThat(result.getBody()).isEqualTo(pdf);
+        assertThat(result.getHeaders().getContentType().toString()).isEqualTo("application/pdf");
+        assertThat(result.getHeaders().getFirst("Content-Disposition")).contains("recapitulatif-dossier-100.pdf");
+
+        verify(applicationFilePdfService).generateClientSummaryPdf("client@mmotors.demo", 100L);
+    }
+
+    @Test
+    @DisplayName("Doit télécharger le récapitulatif PDF côté administration")
+    void shouldDownloadAdminSummaryPdf() {
+        byte[] pdf = "%PDF-1.4".getBytes();
+
+        when(applicationFilePdfService.generateAdminSummaryPdf(100L)).thenReturn(pdf);
+
+        ResponseEntity<byte[]> result = applicationFileController.downloadAdminSummaryPdf(100L);
+
+        assertThat(result.getBody()).isEqualTo(pdf);
+        assertThat(result.getHeaders().getContentType().toString()).isEqualTo("application/pdf");
+        assertThat(result.getHeaders().getFirst("Content-Disposition")).contains("recapitulatif-dossier-100.pdf");
+
+        verify(applicationFilePdfService).generateAdminSummaryPdf(100L);
     }
 
     private ApplicationFile buildApplicationFile() {

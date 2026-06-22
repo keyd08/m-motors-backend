@@ -5,9 +5,14 @@ import com.keyd.mmotors.dto.ApplicationFileResponse;
 import com.keyd.mmotors.dto.ApplicationFileStatusRequest;
 import com.keyd.mmotors.entity.ApplicationFile;
 import com.keyd.mmotors.service.ApplicationFileService;
+import com.keyd.mmotors.service.ApplicationFilePdfService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -19,6 +24,7 @@ import java.util.List;
 public class ApplicationFileController {
 
     private final ApplicationFileService applicationFileService;
+    private final ApplicationFilePdfService applicationFilePdfService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -72,6 +78,24 @@ public class ApplicationFileController {
         return ApplicationFileResponse.fromEntity(applicationFile);
     }
 
+
+    @GetMapping(value = "/my/{id}/summary.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> downloadMySummaryPdf(
+            Principal principal,
+            @PathVariable Long id
+    ) {
+        byte[] pdf = applicationFilePdfService.generateClientSummaryPdf(principal.getName(), id);
+
+        return pdfResponse(pdf, "recapitulatif-dossier-" + id + ".pdf");
+    }
+
+    @GetMapping(value = "/admin/{id}/summary.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> downloadAdminSummaryPdf(@PathVariable Long id) {
+        byte[] pdf = applicationFilePdfService.generateAdminSummaryPdf(id);
+
+        return pdfResponse(pdf, "recapitulatif-dossier-" + id + ".pdf");
+    }
+
     @GetMapping("/admin")
     public List<ApplicationFileResponse> findAllApplicationFiles() {
         return applicationFileService.findAllApplicationFiles()
@@ -90,4 +114,14 @@ public class ApplicationFileController {
 
         return ApplicationFileResponse.fromEntity(updatedApplicationFile);
     }
+    private ResponseEntity<byte[]> pdfResponse(byte[] pdf, String filename) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(filename).build().toString()
+                )
+                .body(pdf);
+    }
+
 }
