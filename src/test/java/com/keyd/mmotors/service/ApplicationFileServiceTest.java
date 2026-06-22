@@ -6,6 +6,7 @@ import com.keyd.mmotors.entity.*;
 import com.keyd.mmotors.exception.BusinessRuleException;
 import com.keyd.mmotors.repository.AppUserRepository;
 import com.keyd.mmotors.repository.ApplicationFileRepository;
+import com.keyd.mmotors.repository.DocumentFileRepository;
 import com.keyd.mmotors.repository.VehicleRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ class ApplicationFileServiceTest {
 
     @Mock
     private VehicleRepository vehicleRepository;
+
+    @Mock
+    private DocumentFileRepository documentFileRepository;
 
     @InjectMocks
     private ApplicationFileService applicationFileService;
@@ -71,7 +75,7 @@ class ApplicationFileServiceTest {
         ApplicationFile result = applicationFileService.createApplicationFile("client@mmotors.demo", request);
 
         assertThat(result.getType()).isEqualTo(ApplicationType.PURCHASE);
-        assertThat(result.getStatus()).isEqualTo(ApplicationStatus.SUBMITTED);
+        assertThat(result.getStatus()).isEqualTo(ApplicationStatus.INCOMPLETE);
         assertThat(result.getClient().getEmail()).isEqualTo("client@mmotors.demo");
         assertThat(result.getVehicle().getId()).isEqualTo(10L);
 
@@ -138,4 +142,79 @@ class ApplicationFileServiceTest {
 
         verify(applicationFileRepository).save(applicationFile);
     }
+    @Test
+    @DisplayName("Doit envoyer un dossier client contenant au moins un document")
+    void shouldSubmitClientApplicationFileWhenDocumentsExist() {
+        AppUser client = AppUser.builder()
+                .id(1L)
+                .email("client@mmotors.demo")
+                .password("encoded-password")
+                .role(Role.CLIENT)
+                .firstName("Client")
+                .lastName("Demo")
+                .build();
+
+        Vehicle vehicle = Vehicle.builder()
+                .id(10L)
+                .brand("Peugeot")
+                .model("308")
+                .energy("Diesel")
+                .mileage(85000)
+                .price(new BigDecimal("12900"))
+                .mode(VehicleMode.SALE)
+                .available(true)
+                .build();
+
+        ApplicationFile applicationFile = ApplicationFile.builder()
+                .id(100L)
+                .type(ApplicationType.PURCHASE)
+                .status(ApplicationStatus.INCOMPLETE)
+                .client(client)
+                .vehicle(vehicle)
+                .build();
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+        when(documentFileRepository.countByApplicationFileId(100L)).thenReturn(1L);
+        when(applicationFileRepository.save(applicationFile)).thenReturn(applicationFile);
+
+        ApplicationFile result = applicationFileService.submitClientApplicationFile("client@mmotors.demo", 100L);
+
+        assertThat(result.getStatus()).isEqualTo(ApplicationStatus.SUBMITTED);
+        assertThat(result.getAdminComment()).isNull();
+
+        verify(documentFileRepository).countByApplicationFileId(100L);
+        verify(applicationFileRepository).save(applicationFile);
+    }
+
+    @Test
+    @DisplayName("Doit refuser l'envoi d'un dossier client sans document")
+    void shouldRejectSubmitClientApplicationFileWithoutDocuments() {
+        AppUser client = AppUser.builder()
+                .id(1L)
+                .email("client@mmotors.demo")
+                .password("encoded-password")
+                .role(Role.CLIENT)
+                .firstName("Client")
+                .lastName("Demo")
+                .build();
+
+        ApplicationFile applicationFile = ApplicationFile.builder()
+                .id(100L)
+                .type(ApplicationType.PURCHASE)
+                .status(ApplicationStatus.INCOMPLETE)
+                .client(client)
+                .build();
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(applicationFileRepository.findByIdAndClientId(100L, 1L)).thenReturn(Optional.of(applicationFile));
+        when(documentFileRepository.countByApplicationFileId(100L)).thenReturn(0L);
+
+        assertThatThrownBy(() -> applicationFileService.submitClientApplicationFile("client@mmotors.demo", 100L))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("au moins un document");
+
+        verify(documentFileRepository).countByApplicationFileId(100L);
+    }
+
 }

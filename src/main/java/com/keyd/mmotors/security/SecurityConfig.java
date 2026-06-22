@@ -35,6 +35,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST, "/api/application-files").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/application-files/my/**").hasRole("CLIENT")
+                        .requestMatchers(HttpMethod.PATCH, "/api/application-files/my/**").hasRole("CLIENT")
                         .requestMatchers(HttpMethod.GET, "/api/application-files/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/application-files/admin/**").hasRole("ADMIN")
 

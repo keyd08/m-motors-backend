@@ -51,6 +51,17 @@ public class ApplicationFileController {
         return ApplicationFileResponse.fromEntity(applicationFile);
     }
 
+    @PatchMapping("/my/{id}/submit")
+    public ApplicationFileResponse submitMyApplicationFile(
+            Principal principal,
+            @PathVariable Long id
+    ) {
+        ApplicationFile applicationFile = applicationFileService
+                .submitClientApplicationFile(principal.getName(), id);
+
+        return ApplicationFileResponse.fromEntity(applicationFile);
+    }
+
     @GetMapping("/admin")
     public List<ApplicationFileResponse> findAllApplicationFiles() {
         return applicationFileService.findAllApplicationFiles()

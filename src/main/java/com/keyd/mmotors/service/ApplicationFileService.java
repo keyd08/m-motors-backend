@@ -7,6 +7,7 @@ import com.keyd.mmotors.exception.BusinessRuleException;
 import com.keyd.mmotors.exception.ResourceNotFoundException;
 import com.keyd.mmotors.repository.AppUserRepository;
 import com.keyd.mmotors.repository.ApplicationFileRepository;
+import com.keyd.mmotors.repository.DocumentFileRepository;
 import com.keyd.mmotors.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class ApplicationFileService {
     private final ApplicationFileRepository applicationFileRepository;
     private final AppUserRepository appUserRepository;
     private final VehicleRepository vehicleRepository;
+    private final DocumentFileRepository documentFileRepository;
 
     public ApplicationFile createApplicationFile(String clientEmail, ApplicationFileRequest request) {
         AppUser client = appUserRepository.findByEmail(clientEmail)
@@ -32,7 +34,7 @@ public class ApplicationFileService {
 
         ApplicationFile applicationFile = ApplicationFile.builder()
                 .type(request.type())
-                .status(ApplicationStatus.SUBMITTED)
+                .status(ApplicationStatus.INCOMPLETE)
                 .client(client)
                 .vehicle(vehicle)
                 .build();
@@ -57,6 +59,19 @@ public class ApplicationFileService {
 
     public List<ApplicationFile> findAllApplicationFiles() {
         return applicationFileRepository.findAll();
+    }
+
+    public ApplicationFile submitClientApplicationFile(String clientEmail, Long applicationFileId) {
+        ApplicationFile applicationFile = findClientApplicationFileById(clientEmail, applicationFileId);
+
+        if (documentFileRepository.countByApplicationFileId(applicationFile.getId()) == 0) {
+            throw new BusinessRuleException("Le dossier doit contenir au moins un document avant envoi");
+        }
+
+        applicationFile.setStatus(ApplicationStatus.SUBMITTED);
+        applicationFile.setAdminComment(null);
+
+        return applicationFileRepository.save(applicationFile);
     }
 
     public ApplicationFile updateApplicationFileStatus(Long applicationFileId, ApplicationFileStatusRequest request) {
