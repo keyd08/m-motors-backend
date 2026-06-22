@@ -3,6 +3,7 @@ package com.keyd.mmotors.service;
 import com.keyd.mmotors.dto.DocumentFileRequest;
 import com.keyd.mmotors.entity.AppUser;
 import com.keyd.mmotors.entity.ApplicationFile;
+import com.keyd.mmotors.entity.ApplicationStatus;
 import com.keyd.mmotors.entity.DocumentFile;
 import com.keyd.mmotors.entity.Role;
 import com.keyd.mmotors.entity.DocumentType;
@@ -53,6 +54,8 @@ public class DocumentFileService {
     ) {
         ApplicationFile applicationFile = findClientApplicationFile(clientEmail, applicationFileId);
 
+        ensureApplicationFileCanBeUpdated(applicationFile);
+
         validateDocumentFile(request.contentType(), request.size());
 
         DocumentFile documentFile = DocumentFile.builder()
@@ -74,6 +77,8 @@ public class DocumentFileService {
             MultipartFile file
     ) {
         ApplicationFile applicationFile = findClientApplicationFile(clientEmail, applicationFileId);
+
+        ensureApplicationFileCanBeUpdated(applicationFile);
 
         if (file == null || file.isEmpty()) {
             throw new BusinessRuleException("Le fichier est obligatoire");
@@ -117,6 +122,25 @@ public class DocumentFileService {
         } catch (IOException exception) {
             throw new BusinessRuleException("Impossible d'enregistrer le fichier");
         }
+    }
+
+
+    public void deleteClientDocument(String clientEmail, Long documentFileId) {
+        AppUser client = appUserRepository.findByEmail(clientEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Client introuvable : " + clientEmail));
+
+        DocumentFile documentFile = documentFileRepository.findById(documentFileId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document introuvable avec l'identifiant : " + documentFileId));
+
+        ApplicationFile applicationFile = documentFile.getApplicationFile();
+
+        if (!applicationFile.getClient().getId().equals(client.getId())) {
+            throw new ResourceNotFoundException("Document introuvable pour ce client");
+        }
+
+        ensureApplicationFileCanBeUpdated(applicationFile);
+        deletePhysicalFile(documentFile.getFilePath());
+        documentFileRepository.delete(documentFile);
     }
 
     public List<DocumentFile> findClientDocuments(String clientEmail, Long applicationFileId) {
@@ -172,6 +196,21 @@ public class DocumentFileService {
 
         return applicationFileRepository.findByIdAndClientId(applicationFileId, client.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Dossier introuvable pour ce client"));
+    }
+
+
+    private void ensureApplicationFileCanBeUpdated(ApplicationFile applicationFile) {
+        if (applicationFile.getStatus() != ApplicationStatus.INCOMPLETE) {
+            throw new BusinessRuleException("Le dossier ne peut plus être modifié après son envoi");
+        }
+    }
+
+    private void deletePhysicalFile(String filePath) {
+        try {
+            Files.deleteIfExists(Paths.get(filePath).toAbsolutePath().normalize());
+        } catch (IOException exception) {
+            throw new BusinessRuleException("Impossible de supprimer le fichier");
+        }
     }
 
     private void validateDocumentFile(String contentType, Long size) {

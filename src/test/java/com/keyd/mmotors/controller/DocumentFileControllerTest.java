@@ -153,6 +153,17 @@ class DocumentFileControllerTest {
         verify(documentFileService).findAdminDocuments(100L);
     }
 
+
+    @Test
+    @DisplayName("Doit supprimer un document du client connecté")
+    void shouldDeleteCurrentClientDocument() {
+        Principal principal = () -> "client@mmotors.demo";
+
+        documentFileController.deleteMyDocumentFile(principal, 200L);
+
+        verify(documentFileService).deleteClientDocument("client@mmotors.demo", 200L);
+    }
+
     private DocumentFile buildDocumentFile() {
         AppUser client = AppUser.builder()
                 .id(1L)

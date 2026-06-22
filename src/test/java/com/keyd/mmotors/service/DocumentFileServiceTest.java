@@ -342,9 +342,48 @@ class DocumentFileServiceTest {
         return ApplicationFile.builder()
                 .id(100L)
                 .type(ApplicationType.PURCHASE)
-                .status(ApplicationStatus.SUBMITTED)
+                .status(ApplicationStatus.INCOMPLETE)
                 .client(client)
                 .vehicle(vehicle)
                 .build();
     }
+    @Test
+    @DisplayName("Doit supprimer un document client avant l'envoi du dossier")
+    void shouldDeleteClientDocumentBeforeSubmission() throws Exception {
+        AppUser client = buildClient();
+        ApplicationFile applicationFile = buildApplicationFile(client);
+        applicationFile.setStatus(ApplicationStatus.INCOMPLETE);
+
+        Path storedFile = temporaryDirectory.resolve("piece-identite.pdf");
+        Files.writeString(storedFile, "contenu pdf");
+
+        DocumentFile documentFile = buildStoredDocumentFile(applicationFile);
+        documentFile.setFilePath(storedFile.toString());
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(documentFileRepository.findById(200L)).thenReturn(Optional.of(documentFile));
+
+        documentFileService.deleteClientDocument("client@mmotors.demo", 200L);
+
+        assertThat(storedFile).doesNotExist();
+        verify(documentFileRepository).delete(documentFile);
+    }
+
+    @Test
+    @DisplayName("Doit refuser la suppression d'un document après l'envoi du dossier")
+    void shouldRejectDocumentDeletionAfterSubmission() {
+        AppUser client = buildClient();
+        ApplicationFile applicationFile = buildApplicationFile(client);
+        applicationFile.setStatus(ApplicationStatus.SUBMITTED);
+
+        DocumentFile documentFile = buildStoredDocumentFile(applicationFile);
+
+        when(appUserRepository.findByEmail("client@mmotors.demo")).thenReturn(Optional.of(client));
+        when(documentFileRepository.findById(200L)).thenReturn(Optional.of(documentFile));
+
+        assertThatThrownBy(() -> documentFileService.deleteClientDocument("client@mmotors.demo", 200L))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("ne peut plus être modifié");
+    }
+
 }

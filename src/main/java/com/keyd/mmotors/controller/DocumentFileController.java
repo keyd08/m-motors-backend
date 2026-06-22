@@ -84,6 +84,16 @@ public class DocumentFileController {
                 .toList();
     }
 
+
+    @DeleteMapping("/{documentFileId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMyDocumentFile(
+            Principal principal,
+            @PathVariable Long documentFileId
+    ) {
+        documentFileService.deleteClientDocument(principal.getName(), documentFileId);
+    }
+
     @GetMapping("/{documentFileId}/download")
     public ResponseEntity<Resource> downloadDocumentFile(
             Principal principal,
