@@ -25,7 +25,7 @@ public class DocumentFile {
     @Column(nullable = false)
     private String fileName;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 1024)
     private String filePath;
 
     private String contentType;
